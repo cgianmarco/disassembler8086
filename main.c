@@ -81,6 +81,7 @@ int main(int argc, char *argv[]) {
         char decoded[32];
 
         if ((instr & 0b11111100) == 0b10001000) {
+            
             u8 d = (instr >> 1) & 1;
             u8 w = instr & 1;
 
@@ -148,7 +149,7 @@ int main(int argc, char *argv[]) {
 
         } else if ((instr & 0b11111110) == 0b11000110) {
 
-            unsigned char w = instr & 0b1;
+            u8 w = instr & 0b1;
 
             u8 modrm = fetch8(input_file);
 
@@ -197,6 +198,25 @@ int main(int argc, char *argv[]) {
 
             const char *dst = decoded_rm;
             const char *src = imm_buf;
+
+            printf("Decoded instruction: mov %s, %s\n", dst, src);
+            fprintf(output_file, "mov %s, %s\n", dst, src);
+
+        } else if ((instr & 0b11111100) == 0b10100000) {
+
+            u8 d = (instr >> 1) & 1;
+            u8 w = instr & 1;
+
+            const char *decoded_reg = Registers[w][0];
+
+            char rm_buf[32];
+
+            short d16 = (short) fetch16(input_file);
+            snprintf(rm_buf, sizeof(rm_buf), "[%d]", d16);
+            const char *decoded_rm = rm_buf;
+
+            const char *dst = d ? decoded_rm : decoded_reg;
+            const char *src = d ? decoded_reg : decoded_rm;
 
             printf("Decoded instruction: mov %s, %s\n", dst, src);
             fprintf(output_file, "mov %s, %s\n", dst, src);

@@ -145,6 +145,67 @@ int main(int argc, char *argv[]) {
 
             printf("Decoded instruction: mov %s, %s\n", decoded_reg, imm_buf);
             fprintf(output_file, "mov %s, %s\n", decoded_reg, imm_buf);
+
+        } else if ((instr & 0b11111110) == 0b11000110) {
+
+            unsigned char w = instr & 0b1;
+
+            u8 modrm = fetch8(input_file);
+
+            // reg field expected to be 000
+            u8 mod = (modrm >> 6) & 0b11;
+            u8 rm = modrm & 0b111;
+
+            const char *decoded_rm = NULL;
+
+            char rm_buf[32];
+            char imm_buf[32];
+
+            switch (mod) {
+                case 0b11:
+                    decoded_rm = Registers[w][rm];
+                    break;
+                case 0b00:
+                    if (rm == 0b110) {
+                        short d16 = (short) fetch16(input_file);
+                        snprintf(rm_buf, sizeof(rm_buf), "[%d]", d16);
+                        decoded_rm = rm_buf;
+                    } else {
+                        snprintf(rm_buf, sizeof(rm_buf), "[%s]", Patterns[rm]);
+                        decoded_rm = rm_buf;
+                    }
+                    break;
+                case 0b01:                    
+                    char disp8 = (char) fetch8(input_file);
+                    snprintf(rm_buf, sizeof(rm_buf), "[%s + %d]", Patterns[rm], disp8);
+                    decoded_rm = rm_buf;
+                    break;
+                case 0b10:                    
+                    short disp16 = (short) fetch16(input_file);
+                    snprintf(rm_buf, sizeof(rm_buf), "[%s + %d]", Patterns[rm], disp16);
+                    decoded_rm = rm_buf;
+                    break;
+            }
+
+            if(w == 0){
+                char imm = (char) fetch8(input_file);
+                snprintf(imm_buf, sizeof(imm_buf), "byte %d", imm);
+            } else {
+                short imm = (short) fetch16(input_file);
+                snprintf(imm_buf, sizeof(imm_buf), "word %d", imm);
+            }
+
+            const char *dst = decoded_rm;
+            const char *src = imm_buf;
+
+            printf("Decoded instruction: mov %s, %s\n", dst, src);
+            fprintf(output_file, "mov %s, %s\n", dst, src);
+
+        } else {
+
+            printf("Unknown instruction: %s\n", byte_to_string(instr));
+            return 1;
+
         }
 
         instr = fetch8(input_file);

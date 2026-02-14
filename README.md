@@ -15,5 +15,5 @@ gcc main.c -o dis8086
 ```
 Then run the executable with:
 ```bash
-./dis8086 input output.asm
+./dis8086 examples/example1 output.asm
 ```

@@ -1,7 +1,15 @@
 #include "stdio.h"
+#include "stdlib.h"
 
 typedef unsigned char u8;
 typedef unsigned short u16;
+
+
+typedef struct {
+    u8 * buf;
+    size_t size;
+    size_t cur;
+} Context;
 
 /* Convert a byte to a binary string */
 char * byte_to_string(u8 byte) {
@@ -13,27 +21,30 @@ char * byte_to_string(u8 byte) {
     return buffer;
 }
 
-/* Fetch a byte from file */
-u8 fetch8(FILE *f)
+/* Fetch next byte */
+int fetch8(Context *c, u8 *out)
 {
-    u8 byte = 0;
-    if (fread(&byte, 1, 1, f) != 1) return 0;
+    if (c->cur >= c->size) {
+        return 0;
+    }
+    u8 byte = c->buf[c->cur];
+    c->cur += 1;
+
     printf("Fetched byte: %s\n", byte_to_string(byte));
-    return byte;
+    *out = byte;
+    return 1;
 }
 
-/* Fetch a 16-bit word from file */
-u16 fetch16(FILE *f)
+/* Fetch next 16-bit word */
+int fetch16(Context *c, u16 *out)
 {
-    u8 lo = 0;
-    u8 hi = 0;
+    u8 lo, hi;
+    if (!fetch8(c, &lo) || !fetch8(c, &hi)) {
+        return 0;
+    }
 
-    if (fread(&lo, 1, 1, f) != 1) return 0;
-    if (fread(&hi, 1, 1, f) != 1) return 0;
-
-    printf("Fetched word: %s %s\n", byte_to_string(hi), byte_to_string(lo));
-
-    return (u16)(lo | ((u16)hi << 8));
+    *out = (u16)(lo | ((u16)hi << 8));
+    return 1;
 }
 
 int main(int argc, char *argv[]) {
@@ -44,8 +55,10 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+
+    /* Load the input file into memory */
+    /* and prepare the context */
     const char * input_filename = argv[1];
-    const char * output_filename = argv[2];
 
     FILE *input_file = fopen(input_filename, "rb");
     if (!input_file) {
@@ -53,6 +66,29 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    fseek(input_file, 0, SEEK_END);
+    long size = ftell(input_file);
+    rewind(input_file);
+
+    u8 *buf = malloc(size);
+    if (!buf) { 
+        fclose(input_file); 
+        printf("Failed to allocate memory for input file\n");
+        return 1;
+    }
+
+    fread(buf, 1, size, input_file);
+    fclose(input_file);
+
+    Context context = {
+        .buf = buf,
+        .size = size,
+        .cur = 0
+    };
+
+
+
+    const char * output_filename = argv[2];
     FILE *output_file = fopen(output_filename, "w+");
     if (!output_file) {
         printf("Failed to open output file: %s\n", output_filename);
@@ -75,17 +111,22 @@ int main(int argc, char *argv[]) {
         "bx"
     };
 
-    u8 instr = fetch8(input_file);
+    u8 instr;
 
-    while (instr != 0) {
+    while (fetch8(&context, &instr)) {
         char decoded[32];
 
+        // MOV
         if ((instr & 0b11111100) == 0b10001000) {
             
             u8 d = (instr >> 1) & 1;
             u8 w = instr & 1;
 
-            u8 modrm = fetch8(input_file);
+            u8 modrm;
+            if (!fetch8(&context, &modrm)) {
+                printf("Failed to fetch ModR/M byte\n");
+                return 1;
+            }
 
             u8 mod = (modrm >> 6) & 0b11;
             u8 reg = (modrm >> 3) & 0b111;
@@ -102,7 +143,11 @@ int main(int argc, char *argv[]) {
                     break;
                 case 0b00:
                     if (rm == 0b110) {
-                        short d16 = (short) fetch16(input_file);
+                        short d16;
+                        if (!fetch16(&context, (u16 *)&d16)) {
+                            printf("Failed to fetch 16-bit displacement\n");
+                            return 1;
+                        }
                         snprintf(rm_buf, sizeof(rm_buf), "[%d]", d16);
                         decoded_rm = rm_buf;
                     } else {
@@ -111,12 +156,20 @@ int main(int argc, char *argv[]) {
                     }
                     break;
                 case 0b01:                    
-                    char disp8 = (char) fetch8(input_file);
+                    char disp8;
+                    if (!fetch8(&context, (u8 *)&disp8)) {
+                        printf("Failed to fetch 8-bit displacement\n");
+                        return 1;
+                    }
                     snprintf(rm_buf, sizeof(rm_buf), "[%s + %d]", Patterns[rm], disp8);
                     decoded_rm = rm_buf;
                     break;
                 case 0b10:                    
-                    short disp16 = (short) fetch16(input_file);
+                    short disp16;
+                    if (!fetch16(&context, (u16 *)&disp16)) {
+                        printf("Failed to fetch 16-bit displacement\n");
+                        return 1;
+                    }
                     snprintf(rm_buf, sizeof(rm_buf), "[%s + %d]", Patterns[rm], disp16);
                     decoded_rm = rm_buf;
                     break;
@@ -137,10 +190,18 @@ int main(int argc, char *argv[]) {
             char imm_buf[32];
 
             if(w == 0){
-                char imm = (char) fetch8(input_file);
+                char imm;
+                if (!fetch8(&context, (u8 *)&imm)) {
+                    printf("Failed to fetch 8-bit immediate\n");
+                    return 1;
+                }
                 snprintf(imm_buf, sizeof(imm_buf), "%d", imm);
             } else {
-                short imm = (short) fetch16(input_file);
+                short imm;
+                if (!fetch16(&context, (u16 *)&imm)) {
+                    printf("Failed to fetch 16-bit immediate\n");
+                    return 1;
+                }
                 snprintf(imm_buf, sizeof(imm_buf), "%d", imm);
             }
 
@@ -151,7 +212,11 @@ int main(int argc, char *argv[]) {
 
             u8 w = instr & 0b1;
 
-            u8 modrm = fetch8(input_file);
+            u8 modrm;
+            if (!fetch8(&context, &modrm)) {
+                printf("Failed to fetch ModR/M byte\n");
+                return 1;
+            }
 
             // reg field expected to be 000
             u8 mod = (modrm >> 6) & 0b11;
@@ -168,7 +233,11 @@ int main(int argc, char *argv[]) {
                     break;
                 case 0b00:
                     if (rm == 0b110) {
-                        short d16 = (short) fetch16(input_file);
+                        short d16;
+                        if (!fetch16(&context, (u16 *)&d16)) {
+                            printf("Failed to fetch 16-bit displacement\n");
+                            return 1;
+                        }
                         snprintf(rm_buf, sizeof(rm_buf), "[%d]", d16);
                         decoded_rm = rm_buf;
                     } else {
@@ -177,22 +246,38 @@ int main(int argc, char *argv[]) {
                     }
                     break;
                 case 0b01:                    
-                    char disp8 = (char) fetch8(input_file);
+                    char disp8;
+                    if (!fetch8(&context, (u8 *)&disp8)) {
+                        printf("Failed to fetch 8-bit displacement\n");
+                        return 1;
+                    }
                     snprintf(rm_buf, sizeof(rm_buf), "[%s + %d]", Patterns[rm], disp8);
                     decoded_rm = rm_buf;
                     break;
                 case 0b10:                    
-                    short disp16 = (short) fetch16(input_file);
+                    short disp16;
+                    if (!fetch16(&context, (u16 *)&disp16)) {
+                        printf("Failed to fetch 16-bit displacement\n");
+                        return 1;
+                    }
                     snprintf(rm_buf, sizeof(rm_buf), "[%s + %d]", Patterns[rm], disp16);
                     decoded_rm = rm_buf;
                     break;
             }
 
             if(w == 0){
-                char imm = (char) fetch8(input_file);
+                char imm;
+                if (!fetch8(&context, (u8 *)&imm)) {
+                    printf("Failed to fetch 8-bit immediate\n");
+                    return 1;
+                }
                 snprintf(imm_buf, sizeof(imm_buf), "byte %d", imm);
             } else {
-                short imm = (short) fetch16(input_file);
+                short imm;
+                if (!fetch16(&context, (u16 *)&imm)) {
+                    printf("Failed to fetch 16-bit immediate\n");
+                    return 1;
+                }
                 snprintf(imm_buf, sizeof(imm_buf), "word %d", imm);
             }
 
@@ -211,7 +296,11 @@ int main(int argc, char *argv[]) {
 
             char rm_buf[32];
 
-            short d16 = (short) fetch16(input_file);
+            short d16;
+            if (!fetch16(&context, (u16 *)&d16)) {
+                printf("Failed to fetch 16-bit displacement\n");
+                return 1;
+            }
             snprintf(rm_buf, sizeof(rm_buf), "[%d]", d16);
             const char *decoded_rm = rm_buf;
 
@@ -221,13 +310,172 @@ int main(int argc, char *argv[]) {
             printf("Decoded instruction: mov %s, %s\n", dst, src);
             fprintf(output_file, "mov %s, %s\n", dst, src);
 
+        // ADD
+        } else if((instr & 0b11111100) == 0b0) {
+
+            u8 d = (instr >> 1) & 1;
+            u8 w = instr & 1;
+
+            u8 modrm;
+            if (!fetch8(&context, &modrm)) {
+                printf("Failed to fetch ModR/M byte\n");
+                return 1;
+            }
+
+            u8 mod = (modrm >> 6) & 0b11;
+            u8 reg = (modrm >> 3) & 0b111;
+            u8 rm = modrm & 0b111;
+
+            const char *decoded_reg = Registers[w][reg];
+            const char *decoded_rm = NULL;
+
+            char rm_buf[32];
+
+            switch (mod) {
+                case 0b11:
+                    decoded_rm = Registers[w][rm];
+                    break;
+                case 0b00:
+                    if (rm == 0b110) {
+                        short d16;
+                        if (!fetch16(&context, (u16 *)&d16)) {
+                            printf("Failed to fetch 16-bit displacement\n");
+                            return 1;
+                        }
+                        snprintf(rm_buf, sizeof(rm_buf), "[%d]", d16);
+                        decoded_rm = rm_buf;
+                    } else {
+                        snprintf(rm_buf, sizeof(rm_buf), "[%s]", Patterns[rm]);
+                        decoded_rm = rm_buf;
+                    }
+                    break;
+                case 0b01:                    
+                    char disp8;
+                    if (!fetch8(&context, (u8 *)&disp8)) {
+                        printf("Failed to fetch 8-bit displacement\n");
+                        return 1;
+                    }
+                    snprintf(rm_buf, sizeof(rm_buf), "[%s + %d]", Patterns[rm], disp8);
+                    decoded_rm = rm_buf;
+                    break;
+                case 0b10:                    
+                    short disp16;
+                    if (!fetch16(&context, (u16 *)&disp16)) {
+                        printf("Failed to fetch 16-bit displacement\n");
+                        return 1;
+                    }
+                    snprintf(rm_buf, sizeof(rm_buf), "[%s + %d]", Patterns[rm], disp16);
+                    decoded_rm = rm_buf;
+                    break;
+            }
+
+            const char *dst = d ? decoded_reg : decoded_rm;
+            const char *src = d ? decoded_rm : decoded_reg;
+
+            printf("Decoded instruction: add %s, %s\n", dst, src);
+            fprintf(output_file, "add %s, %s\n", dst, src);
+
+        } else if ((instr & 0b11111100) == 0b10000000) {
+
+            u8 s = (instr >> 1) & 1;
+            u8 w = instr & 1;
+
+            u8 modrm;
+            if (!fetch8(&context, &modrm)) {
+                printf("Failed to fetch ModR/M byte\n");
+                return 1;
+            }
+
+            u8 mod = (modrm >> 6) & 0b11;
+            u8 reg = (modrm >> 3) & 0b111; // reg field expected to be 000 for ADD
+            u8 rm = modrm & 0b111;
+
+            const char *decoded_rm = NULL;
+
+            char rm_buf[32];
+
+            char * size_str = w ? "word" : "byte";
+
+            switch (mod) {
+                case 0b11:
+                    decoded_rm = Registers[w][rm];
+                    break;
+                case 0b00:
+                    if (rm == 0b110) {
+                        short d16;
+                        if (!fetch16(&context, (u16 *)&d16)) {
+                            printf("Failed to fetch 16-bit displacement\n");
+                            return 1;
+                        }
+                        snprintf(rm_buf, sizeof(rm_buf), "%s [%d]", size_str, d16);
+                        decoded_rm = rm_buf;
+                    } else {
+                        snprintf(rm_buf, sizeof(rm_buf), "%s [%s]", size_str, Patterns[rm]);
+                        decoded_rm = rm_buf;
+                    }
+                    break;
+                case 0b01:                    
+                    char disp8;
+                    if (!fetch8(&context, (u8 *)&disp8)) {
+                        printf("Failed to fetch 8-bit displacement\n");
+                        return 1;
+                    }
+                    snprintf(rm_buf, sizeof(rm_buf), "%s [%s + %d]", size_str, Patterns[rm], disp8);
+                    decoded_rm = rm_buf;
+                    break;
+                case 0b10:                    
+                    short disp16;
+                    if (!fetch16(&context, (u16 *)&disp16)) {
+                        printf("Failed to fetch 16-bit displacement\n");
+                        return 1;
+                    }
+                    snprintf(rm_buf, sizeof(rm_buf), "%s [%s + %d]", size_str, Patterns[rm], disp16);
+                    decoded_rm = rm_buf;
+                    break;
+            }
+
+            char imm_buf[32];
+
+            if (w == 0) {
+                char imm;
+                if (!fetch8(&context, (u8 *)&imm)) {
+                    printf("Failed to fetch 8-bit immediate\n");
+                    return 1;
+                }
+                snprintf(imm_buf, sizeof(imm_buf), "%d", imm);
+            } else {
+                if (s == 0) {
+                    short imm;
+                    if (!fetch16(&context, (u16 *)&imm)) {
+                        printf("Failed to fetch 16-bit immediate\n");
+                        return 1;
+                    }
+                    snprintf(imm_buf, sizeof(imm_buf), "%d", imm);
+                    
+                } else {
+                    char imm8_signed;
+                    if (!fetch8(&context, (u8 *)&imm8_signed)) {
+                        printf("Failed to fetch 8-bit immediate\n");
+                        return 1;
+                    }
+                    short imm8 = (short)imm8_signed;
+                    snprintf(imm_buf, sizeof(imm_buf), "%d", imm8);
+                }
+            }
+
+            const char *dst = decoded_rm;
+            const char *src = imm_buf;
+
+            printf("Decoded instruction: add %s, %s\n", dst, src);
+            fprintf(output_file, "add %s, %s\n", dst, src);
+
         } else {
 
             printf("Unknown instruction: %s\n", byte_to_string(instr));
             return 1;
 
         }
-
-        instr = fetch8(input_file);
     }
+
+    free(buf);
 }

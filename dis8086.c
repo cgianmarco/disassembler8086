@@ -25,23 +25,29 @@ static const char * Patterns[] = {
 };
 
 
-void format_rm(char *out, size_t n, ModRM *modrm, u8 w) {
+void format_rm(char *out, size_t n, ModRM *modrm, u8 w, u8 use_size_prefix) {
+
+    char size_prefix[16] = "";
+    if (use_size_prefix) {
+        snprintf(size_prefix, sizeof(size_prefix), "%s ", w ? "word" : "byte");
+    }
+    
     switch (modrm->mod) {
         case 0b11:
             snprintf(out, n, "%s", Registers[w][modrm->rm]);
             break;
         case 0b00:
             if (modrm->rm == 0b110) {
-                snprintf(out, n, "[%d]", modrm->disp);
+                snprintf(out, n, "%s[%d]", size_prefix, modrm->disp);
             } else {
-                snprintf(out, n, "[%s]", Patterns[modrm->rm]);
+                snprintf(out, n, "%s[%s]", size_prefix, Patterns[modrm->rm]);
             }
             break;
         case 0b01:
-            snprintf(out, n, "[%s + %d]", Patterns[modrm->rm], (char)modrm->disp);
+            snprintf(out, n, "%s[%s + %d]", size_prefix, Patterns[modrm->rm], (char)modrm->disp);
             break;
         case 0b10:
-            snprintf(out, n, "[%s + %d]", Patterns[modrm->rm], modrm->disp);
+            snprintf(out, n, "%s[%s + %d]", size_prefix, Patterns[modrm->rm], modrm->disp);
             break;
     }
 }
@@ -85,7 +91,7 @@ int main(int argc, char *argv[]) {
             const char *decoded_reg = Registers[w][modrm.reg];
 
             char decoded_rm[32];
-            format_rm(decoded_rm, sizeof(decoded_rm), &modrm, w);
+            format_rm(decoded_rm, sizeof(decoded_rm), &modrm, w, 0);
 
             const char *dst = d ? decoded_reg : decoded_rm;
             const char *src = d ? decoded_rm : decoded_reg;
@@ -118,7 +124,7 @@ int main(int argc, char *argv[]) {
             }
 
             char decoded_rm[32];
-            format_rm(decoded_rm, sizeof(decoded_rm), &modrm, w);
+            format_rm(decoded_rm, sizeof(decoded_rm), &modrm, w, 1);
             
 
             short imm;
@@ -126,14 +132,8 @@ int main(int argc, char *argv[]) {
                 printf("Failed to decode immediate value\n");
                 return 1;
             }
-            char imm_buf[32];
 
-            snprintf(imm_buf, sizeof(imm_buf), "%s %d", w ? "word" : "byte", imm);
-
-            const char *dst = decoded_rm;
-            const char *src = imm_buf;
-
-            snprintf(decoded, sizeof(decoded), "mov %s, %s", dst, src);
+            snprintf(decoded, sizeof(decoded), "mov %s, %d", decoded_rm, imm);
 
         } else if ((instr & 0b11111100) == 0b10100000) {
 
@@ -171,7 +171,7 @@ int main(int argc, char *argv[]) {
 
             const char *decoded_reg = Registers[w][modrm.reg];
             char decoded_rm[32];
-            format_rm(decoded_rm, sizeof(decoded_rm), &modrm, w);
+            format_rm(decoded_rm, sizeof(decoded_rm), &modrm, w, 0);
 
             const char *dst = d ? decoded_reg : decoded_rm;
             const char *src = d ? decoded_rm : decoded_reg;
@@ -190,7 +190,7 @@ int main(int argc, char *argv[]) {
             }
 
             char decoded_rm[32];
-            format_rm(decoded_rm, sizeof(decoded_rm), &modrm, w);
+            format_rm(decoded_rm, sizeof(decoded_rm), &modrm, w, 1);
 
             short imm;
             if(!decode_imm(&context, &imm, w, s)) {
@@ -198,13 +198,17 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
 
-            char imm_buf[32];
-            snprintf(imm_buf, sizeof(imm_buf), "%s %d", w ? "word" : "byte", imm);
-
-            const char *dst = decoded_rm;
-            const char *src = imm_buf;
-
-            snprintf(decoded, sizeof(decoded), "add %s, %s", dst, src);
+            switch (modrm.reg) {
+                case 0b000: 
+                    snprintf(decoded, sizeof(decoded), "add %s, %d", decoded_rm, imm);
+                    break;
+                case 0b101: 
+                    snprintf(decoded, sizeof(decoded), "sub %s, %d", decoded_rm, imm);
+                    break;
+                default:
+                    snprintf(decoded, sizeof(decoded), "Unknown ADD opcode with reg field: %d", modrm.reg);
+                    break;
+            }
 
         } else if ((instr & 0b11111110) == 0b00000100) { 
 
@@ -219,6 +223,41 @@ int main(int argc, char *argv[]) {
             }
 
             snprintf(decoded, sizeof(decoded), "add %s, %d", decoded_reg, imm);
+
+        // SUB
+        } else if((instr & 0b11111100) == 0b00101000) {
+
+            u8 d = (instr >> 1) & 1;
+            u8 w = instr & 1;
+
+            ModRM modrm;
+            if(!decode_modrm(&context, &modrm)) {
+                printf("Failed to decode ModR/M byte\n");
+                return 1;
+            }
+
+            const char *decoded_reg = Registers[w][modrm.reg];
+            char decoded_rm[32];
+            format_rm(decoded_rm, sizeof(decoded_rm), &modrm, w, 0);
+
+            const char *dst = d ? decoded_reg : decoded_rm;
+            const char *src = d ? decoded_rm : decoded_reg;
+
+            snprintf(decoded, sizeof(decoded), "sub %s, %s", dst, src);
+
+        } else if ((instr & 0b11111110) == 0b00101100) { 
+
+            u8 w = instr & 1;
+
+            const char *decoded_reg = Registers[w][0];
+
+            short imm;
+            if(!decode_imm(&context, &imm, w, 0)) {
+                printf("Failed to decode immediate value\n");
+                return 1;
+            }
+
+            snprintf(decoded, sizeof(decoded), "sub %s, %d", decoded_reg, imm);
 
         } else {
 

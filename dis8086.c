@@ -206,6 +206,20 @@ int main(int argc, char *argv[]) {
 
             snprintf(decoded, sizeof(decoded), "add %s, %s", dst, src);
 
+        } else if ((instr & 0b11111110) == 0b00000100) { 
+
+            u8 w = instr & 1;
+
+            const char *decoded_reg = Registers[w][0];
+
+            short imm;
+            if(!decode_imm(&context, &imm, w, 0)) {
+                printf("Failed to decode immediate value\n");
+                return 1;
+            }
+
+            snprintf(decoded, sizeof(decoded), "add %s, %d", decoded_reg, imm);
+
         } else {
 
             printf("Unknown instruction: %s\n", byte_to_string(instr));

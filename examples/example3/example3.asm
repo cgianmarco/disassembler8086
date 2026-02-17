@@ -37,9 +37,9 @@ add ax, [bp]
 add al, [bx + si]
 add ax, bx
 add al, ah
-; add ax, 1000
-; add al, -30
-; add al, 9
+add ax, 1000
+add al, -30
+add al, 9
 
 ; sub bx, [bx+si]
 ; sub bx, [bp]

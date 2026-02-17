@@ -205,6 +205,9 @@ int main(int argc, char *argv[]) {
                 case 0b101: 
                     snprintf(decoded, sizeof(decoded), "sub %s, %d", decoded_rm, imm);
                     break;
+                case 0b111: 
+                    snprintf(decoded, sizeof(decoded), "cmp %s, %d", decoded_rm, imm);
+                    break;
                 default:
                     snprintf(decoded, sizeof(decoded), "Unknown ADD opcode with reg field: %d", modrm.reg);
                     break;
@@ -258,6 +261,41 @@ int main(int argc, char *argv[]) {
             }
 
             snprintf(decoded, sizeof(decoded), "sub %s, %d", decoded_reg, imm);
+        
+        // CMP
+        } else if((instr & 0b11111100) == 0b00111000) {
+
+            u8 d = (instr >> 1) & 1;
+            u8 w = instr & 1;
+
+            ModRM modrm;
+            if(!decode_modrm(&context, &modrm)) {
+                printf("Failed to decode ModR/M byte\n");
+                return 1;
+            }
+
+            const char *decoded_reg = Registers[w][modrm.reg];
+            char decoded_rm[32];
+            format_rm(decoded_rm, sizeof(decoded_rm), &modrm, w, 0);
+
+            const char *dst = d ? decoded_reg : decoded_rm;
+            const char *src = d ? decoded_rm : decoded_reg;
+
+            snprintf(decoded, sizeof(decoded), "cmp %s, %s", dst, src);
+
+        } else if ((instr & 0b11111110) == 0b00111100) { 
+
+            u8 w = instr & 1;
+
+            const char *decoded_reg = Registers[w][0];
+
+            short imm;
+            if(!decode_imm(&context, &imm, w, 0)) {
+                printf("Failed to decode immediate value\n");
+                return 1;
+            }
+
+            snprintf(decoded, sizeof(decoded), "cmp %s, %d", decoded_reg, imm);
 
         } else {
 

@@ -15,6 +15,9 @@ The disassembler currently supports a subset of 8086 instructions:
 - **SUB (Register/Memory with Register)**: `001010dw`
 - **SUB (Immediate from Register/Memory)**: `100000sw`
 - **SUB (Immediate from Accumulator)**: `0010110w`
+- **CMP (Register/Memory with Register)**: `001110dw`
+- **CMP (Immediate with Register/Memory)**: `100000sw`
+- **CMP (Immediate with Accumulator)**: `0011110w`
 
 ## Usage
 To use the disassembler, compile with a C compiler.

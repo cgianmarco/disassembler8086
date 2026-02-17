@@ -15,9 +15,9 @@ The disassembler currently supports a subset of 8086 instructions, including:
 ## Usage
 To use the disassembler, compile with a C compiler.
 ```bash
-gcc main.c -o dis8086
+gcc dis8086.c -o dis8086
 ```
 Then run the executable with:
 ```bash
-./dis8086 examples/example1/example1 output.asm
+./dis8086 examples/example1/example1
 ```

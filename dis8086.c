@@ -209,7 +209,7 @@ int main(int argc, char *argv[]) {
                     snprintf(decoded, sizeof(decoded), "cmp %s, %d", decoded_rm, imm);
                     break;
                 default:
-                    snprintf(decoded, sizeof(decoded), "Unknown ADD opcode with reg field: %d", modrm.reg);
+                    snprintf(decoded, sizeof(decoded), "Unknown reg field: %d", modrm.reg);
                     break;
             }
 

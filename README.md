@@ -12,6 +12,9 @@ The disassembler currently supports a subset of 8086 instructions, including:
 - **ADD (Register/Memory with Register to Either)**: Opcode `000000dw`, adds register to register/memory or memory to register with mod-reg-r/m encoding and optional displacement bytes.
 - **ADD (Immediate to Register/Memory)**: Opcode `100000sw`, adds immediate data to register/memory locations with mod-000-r/m encoding, optional displacement bytes, and data bytes (sign-extended if s=1 and w=1).
 - **ADD (Immediate to Accumulator)**: Opcode `0000010w`, adds immediate data directly to the accumulator register (AL if w=0, AX if w=1).
+- **SUB (Register/Memory with Register to Either)**: Opcode `001010dw`, subtracts register from register/memory or memory from register with mod-reg-r/m encoding and optional displacement bytes.
+- **SUB (Immediate from Register/Memory)**: Opcode `100000sw`, subtracts immediate data from register/memory locations with mod-101-r/m encoding, optional displacement bytes, and data bytes (sign-extended if s=1 and w=1).
+- **SUB (Immediate from Accumulator)**: Opcode `0010110w`, subtracts immediate data directly from the accumulator register (AL if w=0, AX if w=1).
 
 ## Usage
 To use the disassembler, compile with a C compiler.

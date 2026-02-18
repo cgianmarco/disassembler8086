@@ -297,6 +297,37 @@ int main(int argc, char *argv[]) {
 
             snprintf(decoded, sizeof(decoded), "cmp %s, %d", decoded_reg, imm);
 
+        // JUMP
+        } else if (instr == 0b01110100) { 
+
+            char rel8;
+            if (!fetch8(&context, (u8 *)&rel8)) {
+                printf("Failed to fetch 8-bit relative offset\n");
+                return 1;
+            }
+
+            snprintf(decoded, sizeof(decoded), "je %d", (char)rel8);
+
+        } else if (instr == 0b01111100) { 
+
+            char rel8;
+            if (!fetch8(&context, (u8 *)&rel8)) {
+                printf("Failed to fetch 8-bit relative offset\n");
+                return 1;
+            }
+
+            snprintf(decoded, sizeof(decoded), "jl %d", (char)rel8);
+
+        } else if (instr == 0b01111110) { 
+
+            char rel8;
+            if (!fetch8(&context, (u8 *)&rel8)) {
+                printf("Failed to fetch 8-bit relative offset\n");
+                return 1;
+            }
+
+            snprintf(decoded, sizeof(decoded), "jle %d", (char)rel8);
+
         } else {
 
             printf("Unknown instruction: %s\n", byte_to_string(instr));

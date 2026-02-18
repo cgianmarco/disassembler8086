@@ -18,6 +18,9 @@ The disassembler currently supports a subset of 8086 instructions:
 - **CMP (Register/Memory with Register)**: `001110dw`
 - **CMP (Immediate with Register/Memory)**: `100000sw`
 - **CMP (Immediate with Accumulator)**: `0011110w`
+- **JE/JZ (Jump on Equal/Zero)**: `01110100`
+- **JL/JNGE (Jump on Less/Not Greater or Equal)**: `01111100`
+- **JLE/JNG (Jump on Less or Equal/Not Greater)**: `01111110`
 
 ## Usage
 To use the disassembler, compile with a C compiler.

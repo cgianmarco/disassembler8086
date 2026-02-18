@@ -76,9 +76,10 @@ int main(int argc, char *argv[]) {
     while (fetch8(&context, &instr)) {
         char decoded[32];
 
-        // MOV
         if ((instr & 0b11111100) == 0b10001000) {
-            
+
+            /* MOV (Register/Memory to/from Register) */
+
             u8 d = (instr >> 1) & 1;
             u8 w = instr & 1;
 
@@ -100,6 +101,8 @@ int main(int argc, char *argv[]) {
 
         } else if ((instr & 0b11110000) == 0b10110000) {
 
+            /* MOV (Immediate to Register) */
+
             unsigned char w = (instr >> 3) & 0b1;
             unsigned char reg = instr & 0b111;
 
@@ -114,6 +117,8 @@ int main(int argc, char *argv[]) {
             sprintf(decoded, "mov %s, %d", decoded_reg, imm);
 
         } else if ((instr & 0b11111110) == 0b11000110) {
+
+            /* MOV (Immediate to Register/Memory) */
 
             u8 w = instr & 0b1;
 
@@ -137,6 +142,8 @@ int main(int argc, char *argv[]) {
 
         } else if ((instr & 0b11111100) == 0b10100000) {
 
+            /* MOV (Accumulator to/from Memory) */
+
             u8 d = (instr >> 1) & 1;
             u8 w = instr & 1;
 
@@ -157,8 +164,9 @@ int main(int argc, char *argv[]) {
 
             snprintf(decoded, sizeof(decoded), "mov %s, %s", dst, src);
 
-        // ADD
         } else if((instr & 0b11111100) == 0b0) {
+
+            /* ADD (Register/Memory with Register) */
 
             u8 d = (instr >> 1) & 1;
             u8 w = instr & 1;
@@ -179,6 +187,8 @@ int main(int argc, char *argv[]) {
             snprintf(decoded, sizeof(decoded), "add %s, %s", dst, src);
 
         } else if ((instr & 0b11111100) == 0b10000000) {
+
+            /* ADD/SUB/CMP (Immediate to Register/Memory) */
 
             u8 s = (instr >> 1) & 1;
             u8 w = instr & 1;
@@ -215,6 +225,8 @@ int main(int argc, char *argv[]) {
 
         } else if ((instr & 0b11111110) == 0b00000100) { 
 
+            /* ADD (Immediate to Register) */
+
             u8 w = instr & 1;
 
             const char *decoded_reg = Registers[w][0];
@@ -227,8 +239,9 @@ int main(int argc, char *argv[]) {
 
             snprintf(decoded, sizeof(decoded), "add %s, %d", decoded_reg, imm);
 
-        // SUB
         } else if((instr & 0b11111100) == 0b00101000) {
+
+            /* SUB (Register/Memory with Register) */
 
             u8 d = (instr >> 1) & 1;
             u8 w = instr & 1;
@@ -250,6 +263,8 @@ int main(int argc, char *argv[]) {
 
         } else if ((instr & 0b11111110) == 0b00101100) { 
 
+            /* SUB (Immediate from Accumulator) */
+
             u8 w = instr & 1;
 
             const char *decoded_reg = Registers[w][0];
@@ -262,8 +277,9 @@ int main(int argc, char *argv[]) {
 
             snprintf(decoded, sizeof(decoded), "sub %s, %d", decoded_reg, imm);
         
-        // CMP
         } else if((instr & 0b11111100) == 0b00111000) {
+
+            /* CMP (Register/Memory with Register) */
 
             u8 d = (instr >> 1) & 1;
             u8 w = instr & 1;
@@ -285,6 +301,8 @@ int main(int argc, char *argv[]) {
 
         } else if ((instr & 0b11111110) == 0b00111100) { 
 
+            /* CMP (Immediate with Accumulator) */
+
             u8 w = instr & 1;
 
             const char *decoded_reg = Registers[w][0];
@@ -297,8 +315,9 @@ int main(int argc, char *argv[]) {
 
             snprintf(decoded, sizeof(decoded), "cmp %s, %d", decoded_reg, imm);
 
-        // JUMP
         } else if (instr == 0b01110100) { 
+
+            /* JE (Jump if Equal) */
 
             char rel8;
             if (!fetch8(&context, (u8 *)&rel8)) {
@@ -310,6 +329,8 @@ int main(int argc, char *argv[]) {
 
         } else if (instr == 0b01111100) { 
 
+            /* JL (Jump if Less) */
+
             char rel8;
             if (!fetch8(&context, (u8 *)&rel8)) {
                 printf("Failed to fetch 8-bit relative offset\n");
@@ -320,6 +341,8 @@ int main(int argc, char *argv[]) {
 
         } else if (instr == 0b01111110) { 
 
+            /* JLE (Jump if Less or Equal) */
+            
             char rel8;
             if (!fetch8(&context, (u8 *)&rel8)) {
                 printf("Failed to fetch 8-bit relative offset\n");

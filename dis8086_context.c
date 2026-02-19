@@ -1,11 +1,9 @@
 /* Convert a byte to a binary string */
-char * byte_to_string(u8 byte) {
-    static char buffer[9];
+void byte_to_string(u8 byte, char buffer[9]) {
     for(int i = 7; i >= 0; i--) {
         buffer[7 - i] = (byte & (1 << i)) ? '1' : '0';
     }
     buffer[8] = '\0';
-    return buffer;
 }
 
 /* Fetch next byte */

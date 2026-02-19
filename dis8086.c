@@ -353,7 +353,9 @@ int main(int argc, char *argv[]) {
 
         } else {
 
-            printf("Unknown instruction: %s\n", byte_to_string(instr));
+            char byte_str[9];
+            byte_to_string(instr, byte_str);
+            printf("Unknown instruction: %s\n", byte_str);
             return 1;
 
         }
